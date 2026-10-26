@@ -6,6 +6,7 @@ mod daemon;
 mod debugger;
 mod notifications;
 mod sock;
+#[cfg(unix)]
 mod ssh_agent;
 mod state;
 mod timeout;
@@ -53,9 +54,14 @@ async fn tokio_main(
     let agent =
         crate::agent::Agent::new(timer_r, sync_timer_r, state.clone());
 
-    let ssh_agent = crate::ssh_agent::SshAgent::new(state.clone());
-
-    tokio::try_join!(agent.run(listener), ssh_agent.run())?;
+    #[cfg(unix)]
+    {
+        let ssh_agent = crate::ssh_agent::SshAgent::new(state.clone());
+        tokio::try_join!(agent.run(listener), ssh_agent.run())?;
+    }
+    // shortcut: no ssh-agent on windows (it would need its own named pipe)
+    #[cfg(windows)]
+    agent.run(listener).await?;
 
     Ok(())
 }

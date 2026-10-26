@@ -1,4 +1,6 @@
-use std::{io::Read as _, os::unix::ffi::OsStringExt as _};
+use std::io::Read as _;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStringExt as _;
 
 use anyhow::Context as _;
 
@@ -58,6 +60,9 @@ pub fn quit() -> anyhow::Result<()> {
             let pidfile = rbw::dirs::pid_file();
             let mut pid = String::new();
             std::fs::File::open(pidfile)?.read_to_string(&mut pid)?;
+            #[cfg(windows)]
+            let pid: u32 = pid.trim_end().parse()?;
+            #[cfg(unix)]
             let Some(pid) =
                 rustix::process::Pid::from_raw(pid.trim_end().parse()?)
             else {
@@ -178,6 +183,12 @@ fn connect() -> anyhow::Result<crate::sock::Sock> {
     })
 }
 
+#[cfg(windows)]
+fn wait_for_exit(pid: u32) {
+    rbw::win::wait_for_exit(pid);
+}
+
+#[cfg(unix)]
 fn wait_for_exit(pid: rustix::process::Pid) {
     loop {
         if rustix::process::test_kill_process(pid).is_err() {
@@ -188,6 +199,10 @@ fn wait_for_exit(pid: rustix::process::Pid) {
 }
 
 fn get_environment() -> rbw::protocol::Environment {
+    // windows has no ttyname(); only RBW_TTY is honoured there
+    #[cfg(windows)]
+    let tty = std::env::var_os("RBW_TTY");
+    #[cfg(unix)]
     let tty = std::env::var_os("RBW_TTY").or_else(|| {
         rustix::termios::ttyname(std::io::stdin(), vec![])
             .ok()
