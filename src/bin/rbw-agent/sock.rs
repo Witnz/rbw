@@ -116,13 +116,20 @@ pub fn incoming(
 ) -> impl futures_util::Stream<Item = std::io::Result<Stream>> {
     futures_util::stream::unfold(Some(listener), |l| async move {
         let mut l = l?;
-        let res = l.server.connect().await;
-        match create_pipe(&l.name, l.sd, false) {
-            Ok(next) => {
-                let cur = std::mem::replace(&mut l.server, next);
-                Some((res.map(|()| cur), Some(l)))
+        loop {
+            let res = l.server.connect().await;
+            let next = match create_pipe(&l.name, l.sd, false) {
+                Ok(next) => next,
+                Err(e) => return Some((Err(e), None)),
+            };
+            let cur = std::mem::replace(&mut l.server, next);
+            match res {
+                Ok(()) => return Some((Ok(cur), Some(l))),
+                // a client that connects and goes away again must not
+                // take the agent down: drop that instance and carry on
+                // with the fresh one
+                Err(e) => log::warn!("pipe client failed to connect: {e}"),
             }
-            Err(e) => Some((Err(e), None)),
         }
     })
 }

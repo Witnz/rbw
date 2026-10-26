@@ -74,12 +74,19 @@ impl Agent {
                         let res =
                             handle_request(&mut sock, state.clone()).await;
                         if let Err(e) = res {
-                            // unwrap is the only option here
-                            sock.send(&rbw::protocol::Response::Error {
-                                error: format!("{e:#}"),
-                            })
-                            .await
-                            .unwrap();
+                            // the client may already be gone (on windows
+                            // a closed pipe is an error here); there is
+                            // nobody left to tell
+                            if let Err(send_err) = sock
+                                .send(&rbw::protocol::Response::Error {
+                                    error: format!("{e:#}"),
+                                })
+                                .await
+                            {
+                                log::debug!(
+                                    "failed to report error to client:                                      {send_err:#}"
+                                );
+                            }
                         }
                     });
                 }
