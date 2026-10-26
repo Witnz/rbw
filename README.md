@@ -1,6 +1,23 @@
-> **Windows port.** This branch builds and runs rbw on native Windows (named-pipe agent). See [WINDOWS.md](WINDOWS.md) for what works,
-> what differs from upstream, and installation. Everything below is upstream's README.
+# rbw for Windows (a fork of doy/rbw)
 
+This repository is a **fork of [doy/rbw](https://github.com/doy/rbw)**, the unofficial Bitwarden / Vaultwarden command line client
+by Jesse Luehrs. Upstream supports Unix only. This fork adds native **Windows** support so `rbw.exe` and `rbw-agent.exe` run on
+Windows 10/11 without WSL.
+
+- **What changed:** the agent talks to the client over a per-user named pipe instead of a unix socket, and it is started
+  detached instead of with `fork`. Everything else is upstream's code. The whole change is small:
+  `git diff 1.15.0..windows` against upstream's `1.15.0` tag.
+- **Where to look:** [WINDOWS.md](WINDOWS.md) has what works, what differs, security notes and installation. Builds and checksummed
+  zips are on the [releases page](../../releases), built by GitHub Actions from this source.
+- **Branches and tags:** `windows` is the default branch (upstream's `1.15.0` release plus the port). Releases are tagged
+  `<upstream version>-windows.<n>`, for example `1.15.0-windows.1`.
+- **Upstream:** bugs that also happen on Linux or macOS belong at [doy/rbw](https://github.com/doy/rbw/issues). This fork is
+  maintained by [@Witnz](https://github.com/Witnz), is not affiliated with or endorsed by Jesse Luehrs, Bitwarden or Vaultwarden,
+  and keeps upstream's MIT licence and copyright (`LICENSE`). If upstream ever adopts Windows support this fork can go away.
+
+Everything below this line is upstream's README.
+
+---
 # rbw
 
 This is an unofficial command line client for
