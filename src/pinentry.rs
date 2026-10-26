@@ -118,8 +118,14 @@ where
                 len -= nl + 1;
                 ncommands -= 1;
             } else if data.starts_with(b"D ") {
-                data.copy_within(2..nl, 0);
-                len = nl - 2;
+                // windows pinentry programs end their lines with CR LF
+                let end = if nl > 2 && data[nl - 1] == 13 {
+                    nl - 1
+                } else {
+                    nl
+                };
+                data.copy_within(2..end, 0);
+                len = end - 2;
                 break;
             } else if data.starts_with(b"S ") {
                 data.copy_within((nl + 1).., 0);
