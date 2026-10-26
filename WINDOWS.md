@@ -27,7 +27,7 @@ Not verified: every 2FA method (FIDO2/WebAuthn is not supported by rbw upstream 
 | ssh-agent | built in | not available on Windows |
 | Debugger / core-dump hardening | prctl, ptrace, rlimit | not available (the agent logs a warning at start); memory locking works |
 | Vault cache file name | `server:email.json` | `server;email.json` (`:` would create an NTFS alternate data stream) |
-| Config and data | XDG-style dirs | `%APPDATA%\<profile>` and `%LOCALAPPDATA%\<profile>` (`rbw` for the default profile) |
+| Config and data | XDG-style dirs | `~/.config/<profile>` (`$XDG_CONFIG_HOME`), `~/.local/cache/<profile>` (`$XDG_CACHE_HOME`), `~/.local/share/<profile>` (`$XDG_DATA_HOME`); `<profile>` is `rbw` for the default profile, `rbw-<name>` for `RBW_PROFILE=<name>`. Nothing is written to AppData. Note the cache default is `~/.local/cache`, not the XDG spec's `~/.cache` |
 
 Any process running as your user can still talk to the agent, exactly as with upstream's private unix socket.
 

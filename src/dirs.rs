@@ -117,29 +117,69 @@ pub fn ssh_agent_socket_file() -> std::path::PathBuf {
     runtime_dir().join("ssh-agent-socket")
 }
 
+// on unix these follow the XDG base directory spec via the directories crate.
+// on windows they are XDG-style paths under the home directory, so the
+// config, cache and data of a profile are where unix users and dotfiles
+// expect them:
+//   config  $XDG_CONFIG_HOME or ~/.config                 /<profile>
+//   cache   $XDG_CACHE_HOME  or ~/.local/cache            /<profile>
+//   data    $XDG_DATA_HOME   or ~/.local/share            /<profile>
+//   runtime <data>/<profile>/runtime
+#[cfg(windows)]
+fn xdg_dir(var: &str, default: &[&str]) -> std::path::PathBuf {
+    let base = std::env::var_os(var)
+        .map(std::path::PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .unwrap_or_else(|| {
+            let mut p = directories::BaseDirs::new()
+                .unwrap()
+                .home_dir()
+                .to_path_buf();
+            p.extend(default);
+            p
+        });
+    base.join(profile())
+}
+
+#[cfg(windows)]
+fn config_dir() -> std::path::PathBuf {
+    xdg_dir("XDG_CONFIG_HOME", &[".config"])
+}
+
+#[cfg(windows)]
+fn cache_dir() -> std::path::PathBuf {
+    xdg_dir("XDG_CACHE_HOME", &[".local", "cache"])
+}
+
+#[cfg(windows)]
+fn data_dir() -> std::path::PathBuf {
+    xdg_dir("XDG_DATA_HOME", &[".local", "share"])
+}
+
+#[cfg(windows)]
+fn runtime_dir() -> std::path::PathBuf {
+    data_dir().join("runtime")
+}
+
+#[cfg(unix)]
 fn config_dir() -> std::path::PathBuf {
     let project_dirs =
         directories::ProjectDirs::from("", "", &profile()).unwrap();
     project_dirs.config_dir().to_path_buf()
 }
 
+#[cfg(unix)]
 fn cache_dir() -> std::path::PathBuf {
     let project_dirs =
         directories::ProjectDirs::from("", "", &profile()).unwrap();
     project_dirs.cache_dir().to_path_buf()
 }
 
+#[cfg(unix)]
 fn data_dir() -> std::path::PathBuf {
     let project_dirs =
         directories::ProjectDirs::from("", "", &profile()).unwrap();
     project_dirs.data_dir().to_path_buf()
-}
-
-#[cfg(windows)]
-fn runtime_dir() -> std::path::PathBuf {
-    let project_dirs =
-        directories::ProjectDirs::from("", "", &profile()).unwrap();
-    project_dirs.data_local_dir().join("runtime")
 }
 
 #[cfg(unix)]
