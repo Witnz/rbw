@@ -1,3 +1,6 @@
+> **Windows port.** This branch builds and runs rbw on native Windows (named-pipe agent). See [WINDOWS.md](WINDOWS.md) for what works,
+> what differs from upstream, and installation. Everything below is upstream's README.
+
 # rbw
 
 This is an unofficial command line client for

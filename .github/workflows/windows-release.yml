@@ -1,0 +1,83 @@
+name: windows-release
+
+# Builds rbw.exe and rbw-agent.exe on a clean Windows runner and publishes them, with checksums, as a GitHub release when a
+# tag like 1.15.0-windows.1 is pushed. Run manually (workflow_dispatch) to build and test without releasing.
+on:
+  push:
+    tags: ['*-windows*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Test
+        shell: pwsh
+        run: cargo test --locked
+
+      - name: Build
+        shell: pwsh
+        run: cargo build --release --locked
+
+      - name: Smoke test (local agent round trip, no server)
+        shell: pwsh
+        run: |
+          $env:RBW_PROFILE = 'ci'
+          $env:RBW_AGENT = (Resolve-Path target\release\rbw-agent.exe).Path
+          $rbw = (Resolve-Path target\release\rbw.exe).Path
+          & $rbw config set email ci@example.invalid
+          & $rbw config set base_url http://127.0.0.1:9
+          & $rbw lock
+          $answer = & $rbw unlocked 2>&1
+          Write-Host "rbw unlocked -> $answer"
+          if ("$answer" -notmatch 'locked') { throw 'the client could not talk to the agent' }
+          & $rbw stop-agent
+          Start-Sleep -Seconds 1
+          if (Get-Process rbw-agent -ErrorAction SilentlyContinue) { throw 'the agent did not stop' }
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "$version-windows.dev" }
+          $name = "rbw-$tag-x64"
+          New-Item -ItemType Directory $name | Out-Null
+          Copy-Item target\release\rbw.exe, target\release\rbw-agent.exe, LICENSE, WINDOWS.md $name
+          Compress-Archive -Path $name -DestinationPath "$name.zip"
+          $lines = foreach ($f in "$name.zip", "$name\rbw.exe", "$name\rbw-agent.exe") {
+            '{0}  {1}' -f (Get-FileHash $f -Algorithm SHA256).Hash.ToLower(), (Split-Path $f -Leaf)
+          }
+          $lines | Set-Content "$name.zip.sha256"
+          "ASSET=$name" | Add-Content $env:GITHUB_ENV
+          Get-Content "$name.zip.sha256"
+
+      - name: Keep the build as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: |
+            ${{ env.ASSET }}.zip
+            ${{ env.ASSET }}.zip.sha256
+
+      - name: Publish the release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME "$env:ASSET.zip" "$env:ASSET.zip.sha256" `
+            --title "rbw $env:GITHUB_REF_NAME" `
+            --notes "Windows build of rbw (named-pipe agent). See WINDOWS.md for what works and what differs from upstream. Verify the download against the .sha256 file."
